@@ -803,7 +803,7 @@ requires-dist = [{ name = "styxdefs", editable = "packages/styxdefs" }]
 
 [[package]]
 name = "styxpodman"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/styxpodman" }
 dependencies = [
     { name = "styxcontainer-common" },
