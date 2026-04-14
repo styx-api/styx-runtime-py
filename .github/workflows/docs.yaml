@@ -1,0 +1,56 @@
+name: Build and publish docs
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+on:
+  workflow_run:
+    workflows: [Tests]
+    types:
+    - completed
+    branches:
+    - main
+  workflow_dispatch:
+
+jobs:
+  build-and-publish-docs:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+        - styxdefs
+        - styxgraph
+        - styxdocker
+        - styxpodman
+        - styxsingularity
+    steps:
+    - uses: actions/checkout@v6
+    - uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+    - name: Install docs group
+      run: uv sync --all-packages --only-group docs
+    - name: Build docs for ${{ matrix.package }}
+      working-directory: packages/${{ matrix.package }}
+      run: |
+        uv run pdoc "src/${{ matrix.package }}" \
+          -o docs_build \
+          -t docs/pdoc-theme \
+          --docformat google
+    - name: Deploy to Cloudflare Pages
+      uses: cloudflare/wrangler-action@v3
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        command: >
+          pages deploy packages/${{ matrix.package }}/docs_build/
+          --project-name=${{ matrix.package }}
+          --branch=main

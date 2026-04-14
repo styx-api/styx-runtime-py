@@ -1,0 +1,55 @@
+name: Publish package to PyPI
+
+# Tag convention: <package>-v<version>
+# Examples:
+#   styxdocker-v0.6.4
+#   styxdefs-v0.7.0
+#   styxcontainer-common-v0.1.1
+#
+# Only the package that matches the tag prefix is built and published.
+
+permissions:
+  actions: write
+
+on:
+  push:
+    tags:
+    - 'styxdefs-v*'
+    - 'styxgraph-v*'
+    - 'styxcontainer-common-v*'
+    - 'styxdocker-v*'
+    - 'styxpodman-v*'
+    - 'styxsingularity-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Parse package name from tag
+      id: parse
+      run: |
+        tag="${GITHUB_REF#refs/tags/}"
+        package="${tag%-v*}"
+        echo "package=${package}" >> "$GITHUB_OUTPUT"
+        echo "Publishing package: ${package}"
+
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Build package
+      working-directory: packages/${{ steps.parse.outputs.package }}
+      run: |
+        uv sync --frozen --no-dev --no-install-project
+        uv build
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: packages/${{ steps.parse.outputs.package }}/dist/
+        user: __token__
+        password: ${{ secrets.PYPI_TOKEN }}
+        verbose: true

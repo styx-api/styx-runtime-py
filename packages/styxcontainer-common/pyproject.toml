@@ -1,17 +1,14 @@
 [project]
-name = "styxdocker"
-version = "0.6.3"
-description = "Docker integration for Styx compiled wrappers."
+name = "styxcontainer-common"
+version = "0.1.0"
+description = "Shared base classes for Styx container runners."
 authors = [
   {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}
 ]
 requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
-dependencies = [
-  "styxdefs>=0.6.0,<0.7",
-  "styxcontainer-common>=0.1.0,<0.2",
-]
+dependencies = ["styxdefs>=0.6.0,<0.7"]
 
 [build-system]
 requires = ["uv_build>=0.8.13,<0.10.0"]
