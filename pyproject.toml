@@ -26,6 +26,7 @@ members = ["packages/*"]
 [tool.uv.sources]
 styxdefs = { workspace = true }
 styxgraph = { workspace = true }
+styxcache = { workspace = true }
 styxcontainer-common = { workspace = true }
 styxdocker = { workspace = true }
 styxpodman = { workspace = true }

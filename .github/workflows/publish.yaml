@@ -16,6 +16,7 @@ on:
     tags:
     - 'styxdefs-v*'
     - 'styxgraph-v*'
+    - 'styxcache-v*'
     - 'styxcontainer-common-v*'
     - 'styxdocker-v*'
     - 'styxpodman-v*'
