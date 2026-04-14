@@ -10,6 +10,7 @@ container runners into a single `uv` workspace.
 | --- | --- |
 | [`styxdefs`](packages/styxdefs) | Core types, protocol, and minimal runtime (local + dry runners). Zero runtime dependencies. |
 | [`styxgraph`](packages/styxgraph) | Middleware runner that records executions as a Mermaid graph. |
+| [`styxcache`](packages/styxcache) | Middleware runner that content-addresses tool outputs for cross-run reuse. |
 | [`styxcontainer-common`](packages/styxcontainer-common) | Internal shared base classes for the container runners. |
 | [`styxdocker`](packages/styxdocker) | Docker runner. |
 | [`styxpodman`](packages/styxpodman) | Podman runner. |
