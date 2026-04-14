@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
@@ -14,6 +15,8 @@ from ._policy import CachePolicy
 from ._store import CacheStore
 
 _KEY_VERSION = 1
+_STDOUT_FILE = ".styxcache.stdout.gz"
+_STDERR_FILE = ".styxcache.stderr.gz"
 
 
 def _canon(p: str | os.PathLike[str]) -> str:
@@ -143,6 +146,8 @@ class _CachingExecution(Execution):
         assert self._entry_dir is not None
 
         if self._is_hit:
+            _replay_stream(self._entry_dir / _STDOUT_FILE, handle_stdout)
+            _replay_stream(self._entry_dir / _STDERR_FILE, handle_stderr)
             return
 
         assert self._staging_dir is not None
@@ -156,16 +161,34 @@ class _CachingExecution(Execution):
                 "runners do). Got base: "
                 f"{type(self._base).__name__}"
             )
+
+        # Tee handlers so we capture lines for later replay while still
+        # forwarding to the caller's handlers in real time.
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+
+        def _tee_stdout(line: str) -> None:
+            stdout_lines.append(line)
+            if handle_stdout is not None:
+                handle_stdout(line)
+
+        def _tee_stderr(line: str) -> None:
+            stderr_lines.append(line)
+            if handle_stderr is not None:
+                handle_stderr(line)
+
         try:
             self._base.output_dir = self._staging_dir  # type: ignore[attr-defined]
             try:
-                self._base.run(cargs, handle_stdout, handle_stderr)
+                self._base.run(cargs, _tee_stdout, _tee_stderr)
             except BaseException:
                 self._runner.store.discard(self._staging_dir)
                 raise
         finally:
             self._base.output_dir = previous_output_dir  # type: ignore[attr-defined]
 
+        _persist_stream(self._staging_dir / _STDOUT_FILE, stdout_lines)
+        _persist_stream(self._staging_dir / _STDERR_FILE, stderr_lines)
         self._runner.store.commit(self._staging_dir, self._key)
 
     # -- key computation ----------------------------------------------------
@@ -232,3 +255,27 @@ def _json_default(obj: typing.Any) -> typing.Any:  # noqa: ANN401
     if isinstance(obj, pathlib.PurePath):
         return os.fspath(obj)
     raise TypeError(f"Unserialisable for cache key: {type(obj).__name__}")
+
+
+def _persist_stream(path: pathlib.Path, lines: list[str]) -> None:
+    """Write captured lines to a gzipped file, one per line."""
+    with gzip.open(path, "wt", encoding="utf-8", newline="\n") as f:
+        for line in lines:
+            f.write(line)
+            f.write("\n")
+
+
+def _replay_stream(
+    path: pathlib.Path,
+    handler: typing.Callable[[str], None] | None,
+) -> None:
+    """Read a gzipped stream file and feed each line to ``handler``.
+
+    Missing files are tolerated — entries committed by older styxcache
+    versions predate stream persistence and simply skip replay.
+    """
+    if handler is None or not path.exists():
+        return
+    with gzip.open(path, "rt", encoding="utf-8", newline="\n") as f:
+        for line in f:
+            handler(line.rstrip("\n"))

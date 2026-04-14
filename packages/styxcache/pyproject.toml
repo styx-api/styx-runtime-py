@@ -1,6 +1,6 @@
 [project]
 name = "styxcache"
-version = "0.1.0"
+version = "0.1.1"
 description = "Content-addressed caching middleware for Styx"
 authors = [
   {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}

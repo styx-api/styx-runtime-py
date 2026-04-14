@@ -52,6 +52,13 @@ class _FakeExecution(Execution):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         # Produce a deterministic output the caller can read back.
         (self.output_dir / "result.txt").write_text("ran\n")
+        # Emit deterministic stdout/stderr lines so tests can assert on
+        # persistence and replay semantics.
+        if handle_stdout is not None:
+            handle_stdout("stdout-line-1")
+            handle_stdout("stdout-line-2")
+        if handle_stderr is not None:
+            handle_stderr("stderr-only")
 
 
 class _FakeRunner(Runner):
@@ -305,6 +312,82 @@ def test_store_commit_handles_race(tmp_path: pathlib.Path) -> None:
     assert result == winner_entry
     assert (winner_entry / "out.txt").read_text() == "winner"
     assert not loser_staging.exists()
+
+
+def test_stdout_replayed_into_caller_handlers_on_hit(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Reproduces the niwrap print_header-style pattern.
+
+    Wrappers that expose tool stdout as a field on their output tuple pass
+    a closure to ``handle_stdout``. On cache hit the base execution is
+    skipped, so the closure would never fire — the fix is to persist
+    captured lines and replay them through the caller's handler.
+    """
+    in_file = tmp_path / "input.txt"
+    in_file.write_text("alpha")
+    base = _FakeRunner(tmp_path / "base")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    def run_like_print_header() -> tuple[list[str], list[str]]:
+        md = Metadata(
+            id="capture.v1",
+            name="capture",
+            package="testpkg",
+            container_image_tag="example/capture:1",
+        )
+        stdout: list[str] = []
+        stderr: list[str] = []
+        ex = cache.start_execution(md)
+        ex.params({"in_file": in_file})
+        ex.input_file(in_file)
+        ex.output_file(".")
+        ex.run(
+            ["tool"],
+            handle_stdout=lambda s: stdout.append(s),
+            handle_stderr=lambda s: stderr.append(s),
+        )
+        return stdout, stderr
+
+    stdout1, stderr1 = run_like_print_header()
+    assert stdout1 == ["stdout-line-1", "stdout-line-2"]
+    assert stderr1 == ["stderr-only"]
+    assert base.total_runs == 1
+
+    stdout2, stderr2 = run_like_print_header()
+    assert base.total_runs == 1  # cache hit
+    assert stdout2 == stdout1
+    assert stderr2 == stderr1
+
+
+def test_stdout_persist_files_are_gzipped(tmp_path: pathlib.Path) -> None:
+    """Confirms the on-disk format is gzip, not plaintext."""
+    import gzip
+
+    in_file = tmp_path / "input.txt"
+    in_file.write_text("alpha")
+    base = _FakeRunner(tmp_path / "base")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    md = Metadata(id="gz.v1", name="gz", package="testpkg", container_image_tag=None)
+    ex = cache.start_execution(md)
+    ex.params({"in_file": in_file})
+    ex.input_file(in_file)
+    ex.output_file(".")
+    ex.run(["tool"], handle_stdout=lambda s: None)
+
+    # Find the committed entry under cache_dir.
+    entries = [
+        d for d in (tmp_path / "cache").rglob("*") if d.is_dir() and len(d.name) == 64
+    ]
+    assert len(entries) == 1
+    stdout_gz = entries[0] / ".styxcache.stdout.gz"
+    assert stdout_gz.exists()
+    # File should be gzipped: reading as text errors, reading via gzip works.
+    with gzip.open(stdout_gz, "rt", encoding="utf-8") as f:
+        content = f.read()
+    assert "stdout-line-1\n" in content
+    assert "stdout-line-2\n" in content
 
 
 def test_local_runner_integration(tmp_path: pathlib.Path) -> None:
