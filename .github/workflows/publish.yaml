@@ -41,15 +41,14 @@ jobs:
         enable-cache: true
 
     - name: Build package
-      working-directory: packages/${{ steps.parse.outputs.package }}
       run: |
         uv sync --frozen --no-dev --no-install-project
-        uv build
+        uv build --package ${{ steps.parse.outputs.package }}
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        packages-dir: packages/${{ steps.parse.outputs.package }}/dist/
+        packages-dir: dist/
         user: __token__
         password: ${{ secrets.PYPI_TOKEN }}
         verbose: true
