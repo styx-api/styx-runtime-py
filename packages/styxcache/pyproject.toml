@@ -1,0 +1,18 @@
+[project]
+name = "styxcache"
+version = "0.1.0"
+description = "Content-addressed caching middleware for Styx"
+authors = [
+  {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+  "styxdefs>=0.6.0,<0.7",
+  "blake3>=1.0.8,<2",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.13,<0.10.0"]
+build-backend = "uv_build"
