@@ -21,13 +21,13 @@ jobs:
       run: uv sync --all-packages --all-groups
 
     - name: Run tests
-      run: >
-        uv run --frozen pytest packages/
-          --junitxml=pytest.xml
-          --cov-report=term-missing:skip-covered
-          --cov-report=xml:coverage.xml
-          --cov=packages
-          --log-level=DEBUG
+      run: |
+        uv run --frozen pytest packages/ \
+          --junitxml=pytest.xml \
+          --cov-report=term-missing:skip-covered \
+          --cov-report=xml:coverage.xml \
+          --cov=packages \
+          --log-level=DEBUG \
           --verbose
 
     - name: Upload coverage to Codecov
