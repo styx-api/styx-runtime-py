@@ -35,9 +35,7 @@ class _FakeExecution(Execution):
     ) -> str:
         return f"/mnt/{pathlib.Path(host_file).name}"
 
-    def output_file(
-        self, local_file: str, optional: bool = False
-    ) -> OutputPathType:
+    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
         self._outputs.append(local_file)
         return self.output_dir / local_file
 
@@ -177,11 +175,7 @@ def test_nested_params_with_input_paths(tmp_path: pathlib.Path) -> None:
         execution = cache.start_execution(metadata)
         params = {
             "stages": [
-                {
-                    "metrics": [
-                        {"fixed_image": f1, "moving_image": f2, "weight": 1.0}
-                    ]
-                }
+                {"metrics": [{"fixed_image": f1, "moving_image": f2, "weight": 1.0}]}
             ],
             "scalar": "hello",
         }

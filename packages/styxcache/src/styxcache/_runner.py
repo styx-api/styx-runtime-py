@@ -120,9 +120,7 @@ class _CachingExecution(Execution):
         )
         return local
 
-    def output_file(
-        self, local_file: str, optional: bool = False
-    ) -> OutputPathType:
+    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
         self._ensure_key_computed()
         assert self._entry_dir is not None
         return self._entry_dir / local_file
