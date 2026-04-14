@@ -1,6 +1,6 @@
 [project]
 name = "styxdefs"
-version = "0.6.0"
+version = "0.6.1"
 description = "Styx definitions and minimal runtime"
 authors = [
   {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}

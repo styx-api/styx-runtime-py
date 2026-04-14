@@ -1,6 +1,6 @@
 [project]
 name = "styxsingularity"
-version = "0.7.1"
+version = "0.7.2"
 description = "Singularity/Apptainer integration for Styx compiled wrappers."
 authors = [
   {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}

@@ -1,6 +1,6 @@
 [project]
 name = "styxgraph"
-version = "0.6.0"
+version = "0.6.1"
 description = "Execution graph middleware for Styx"
 authors = [
   {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}

@@ -772,12 +772,12 @@ requires-dist = [{ name = "styxdefs", editable = "packages/styxdefs" }]
 
 [[package]]
 name = "styxdefs"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "packages/styxdefs" }
 
 [[package]]
 name = "styxdocker"
-version = "0.6.3"
+version = "0.6.4"
 source = { editable = "packages/styxdocker" }
 dependencies = [
     { name = "styxcontainer-common" },
@@ -792,7 +792,7 @@ requires-dist = [
 
 [[package]]
 name = "styxgraph"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "packages/styxgraph" }
 dependencies = [
     { name = "styxdefs" },
@@ -818,7 +818,7 @@ requires-dist = [
 
 [[package]]
 name = "styxsingularity"
-version = "0.7.1"
+version = "0.7.2"
 source = { editable = "packages/styxsingularity" }
 dependencies = [
     { name = "styxcontainer-common" },

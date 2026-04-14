@@ -1,6 +1,6 @@
 [project]
 name = "styxdocker"
-version = "0.6.3"
+version = "0.6.4"
 description = "Docker integration for Styx compiled wrappers."
 authors = [
   {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}
