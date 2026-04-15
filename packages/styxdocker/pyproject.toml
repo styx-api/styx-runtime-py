@@ -1,6 +1,6 @@
 [project]
 name = "styxdocker"
-version = "0.6.4"
+version = "0.7.0"
 description = "Docker integration for Styx compiled wrappers."
 authors = [
   {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}
@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 dependencies = [
   "styxdefs>=0.6.0,<0.7",
-  "styxcontainer-common>=0.1.0,<0.2",
+  "styxcontainer-common>=0.2.0,<0.3",
 ]
 
 [build-system]
