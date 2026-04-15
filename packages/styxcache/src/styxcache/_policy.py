@@ -40,6 +40,11 @@ class CachePolicy:
             folded into the cache key. Use this for variables that affect
             tool output determinism (e.g. ``OMP_NUM_THREADS``). Missing
             variables are encoded as the empty string.
+        bypass_tools: Static denylist of tools that should never be cached,
+            matched against ``f"{metadata.package}/{metadata.name}"`` (for
+            example ``"ants/PrintHeader"``). Use for tools that are
+            intrinsically non-deterministic (random seeds, network calls,
+            system-state probes). Matched exactly — no globbing.
         extra: Arbitrary string-keyed fields added verbatim to the key
             payload. Useful for user-space invalidation bumps.
     """
@@ -47,6 +52,7 @@ class CachePolicy:
     hasher: InputHasher = field(default_factory=ContentHasher)
     image_digest: ImageDigestResolver = trust_tag
     env_allowlist: tuple[str, ...] = ()
+    bypass_tools: frozenset[str] = field(default_factory=frozenset)
     extra: dict[str, str] = field(default_factory=dict)
 
     def env_values(self) -> list[tuple[str, str]]:

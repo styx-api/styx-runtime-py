@@ -11,6 +11,7 @@ import typing
 
 from styxdefs import Execution, InputPathType, Metadata, OutputPathType, Runner
 
+from ._bypass import is_bypassed
 from ._policy import CachePolicy
 from ._store import CacheStore
 
@@ -68,12 +69,27 @@ class CachingRunner(Runner):
         self.policy = policy or CachePolicy()
 
     def start_execution(self, metadata: Metadata) -> Execution:
-        """Begin a cached execution."""
+        """Begin a cached execution, or bypass to the base runner.
+
+        Caching is skipped — and the base runner's execution is returned
+        unwrapped — when either:
+
+        * :func:`styxcache.bypass` is active in the current context.
+        * ``f"{metadata.package}/{metadata.name}"`` is in
+          :attr:`CachePolicy.bypass_tools`.
+        """
+        if is_bypassed() or self._matches_bypass_tools(metadata):
+            return self.base.start_execution(metadata)
         return _CachingExecution(
             base=self.base.start_execution(metadata),
             runner=self,
             metadata=metadata,
         )
+
+    def _matches_bypass_tools(self, metadata: Metadata) -> bool:
+        if not self.policy.bypass_tools:
+            return False
+        return f"{metadata.package}/{metadata.name}" in self.policy.bypass_tools
 
 
 class _CachingExecution(Execution):
