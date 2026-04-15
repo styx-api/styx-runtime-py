@@ -15,7 +15,9 @@ class _FakeExecution(BaseContainerExecution):
     def _build_command(self, cargs):
         return ["fake", *cargs]
 
-    def _make_error(self, return_code, cargs, runtime_command, stdout_tail, stderr_tail):
+    def _make_error(
+        self, return_code, cargs, runtime_command, stdout_tail, stderr_tail
+    ):
         return StyxContainerError(
             return_code=return_code,
             command_args=cargs,
