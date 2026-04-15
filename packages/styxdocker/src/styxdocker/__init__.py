@@ -33,12 +33,16 @@ class StyxDockerError(StyxContainerError):
         return_code: int | None = None,
         command_args: list[str] | None = None,
         docker_args: list[str] | None = None,
+        stdout_tail: list[str] | None = None,
+        stderr_tail: list[str] | None = None,
     ) -> None:
         """Create StyxDockerError."""
         super().__init__(
             return_code=return_code,
             command_args=command_args,
             runtime_args=docker_args,
+            stdout_tail=stdout_tail,
+            stderr_tail=stderr_tail,
         )
 
 
@@ -115,11 +119,15 @@ class _DockerExecution(BaseContainerExecution):
         return_code: int,
         cargs: list[str],
         runtime_command: list[str],
+        stdout_tail: list[str],
+        stderr_tail: list[str],
     ) -> Exception:
         return StyxDockerError(
             return_code=return_code,
             command_args=cargs,
             docker_args=runtime_command,
+            stdout_tail=stdout_tail,
+            stderr_tail=stderr_tail,
         )
 
 

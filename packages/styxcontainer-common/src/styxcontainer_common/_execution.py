@@ -23,6 +23,14 @@ class BaseContainerExecution(Execution):
     into the output directory.
     """
 
+    output_tail_lines: typing.ClassVar[int] = 40
+    """Number of trailing stdout/stderr lines attached to failures.
+
+    Captured from both streams because tools are inconsistent about which
+    one they use for diagnostics (FSL/AFNI/ANTs mostly write to stderr;
+    others put useful error context on stdout).
+    """
+
     def __init__(
         self,
         logger: logging.Logger,
@@ -116,8 +124,25 @@ class BaseContainerExecution(Execution):
         )
         self.logger.debug(f"Running command: {shlex.join(cargs)}")
 
-        _stdout_handler = handle_stdout or (lambda line: self.logger.info(line))
-        _stderr_handler = handle_stderr or (lambda line: self.logger.error(line))
+        # Tool output is quiet by default (debug). On non-zero exit we surface
+        # the last N lines from both streams in the raised exception so users
+        # don't need to rerun with DEBUG to diagnose failures. Child loggers
+        # keep the stream identity in the LogRecord name (e.g. for filters or
+        # a `%(name)s` formatter) without prefixing the line itself.
+        stdout_logger = self.logger.getChild("stdout")
+        stderr_logger = self.logger.getChild("stderr")
+        user_stdout_handler = handle_stdout or (lambda line: stdout_logger.debug(line))
+        user_stderr_handler = handle_stderr or (lambda line: stderr_logger.debug(line))
+        stdout_tail: deque[str] = deque(maxlen=self.output_tail_lines)
+        stderr_tail: deque[str] = deque(maxlen=self.output_tail_lines)
+
+        def _stdout_handler(line: str) -> None:
+            stdout_tail.append(line)
+            user_stdout_handler(line)
+
+        def _stderr_handler(line: str) -> None:
+            stderr_tail.append(line)
+            user_stderr_handler(line)
 
         time_start = datetime.now()
         with Popen(runtime_command, text=True, stdout=PIPE, stderr=PIPE) as process:
@@ -132,7 +157,13 @@ class BaseContainerExecution(Execution):
             f"in {time_end - time_start}"
         )
         if return_code:
-            raise self._make_error(return_code, cargs, runtime_command)
+            raise self._make_error(
+                return_code,
+                cargs,
+                runtime_command,
+                list(stdout_tail),
+                list(stderr_tail),
+            )
 
     def _make_run_script_content(self, cargs: list[str]) -> str:
         """Return the contents of the run.sh script written into the output dir."""
@@ -153,5 +184,7 @@ class BaseContainerExecution(Execution):
         return_code: int,
         cargs: list[str],
         runtime_command: list[str],
+        stdout_tail: list[str],
+        stderr_tail: list[str],
     ) -> Exception:
         """Construct the runtime-specific exception raised on non-zero exit."""

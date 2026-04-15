@@ -45,12 +45,16 @@ class StyxSingularityError(StyxContainerError):
         return_code: int | None = None,
         command_args: list[str] | None = None,
         singularity_args: list[str] | None = None,
+        stdout_tail: list[str] | None = None,
+        stderr_tail: list[str] | None = None,
     ) -> None:
         """Create StyxSingularityError."""
         super().__init__(
             return_code=return_code,
             command_args=command_args,
             runtime_args=singularity_args,
+            stdout_tail=stdout_tail,
+            stderr_tail=stderr_tail,
         )
 
 
@@ -117,11 +121,15 @@ class _SingularityExecution(BaseContainerExecution):
         return_code: int,
         cargs: list[str],
         runtime_command: list[str],
+        stdout_tail: list[str],
+        stderr_tail: list[str],
     ) -> Exception:
         return StyxSingularityError(
             return_code=return_code,
             command_args=cargs,
             singularity_args=runtime_command,
+            stdout_tail=stdout_tail,
+            stderr_tail=stderr_tail,
         )
 
 

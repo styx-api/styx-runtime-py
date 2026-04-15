@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import logging
 import os
 import pathlib
 import typing
@@ -18,6 +19,8 @@ from ._store import CacheStore
 _KEY_VERSION = 1
 _STDOUT_FILE = ".styxcache.stdout.gz"
 _STDERR_FILE = ".styxcache.stderr.gz"
+
+_logger = logging.getLogger("styxcache")
 
 
 def _canon(p: str | os.PathLike[str]) -> str:
@@ -162,6 +165,12 @@ class _CachingExecution(Execution):
         assert self._entry_dir is not None
 
         if self._is_hit:
+            _logger.debug(
+                "cache hit %s (%s/%s)",
+                self._key[:12],
+                self._metadata.package,
+                self._metadata.name,
+            )
             # Bump mtime on hit so downstream GC scripts can evict LRU-style
             # (e.g. `find <cache_dir> -mtime +N -type d -exec rm -rf {} +`).
             # This clobbers the creation timestamp, which we've decided is
@@ -176,6 +185,13 @@ class _CachingExecution(Execution):
             _replay_stream(self._entry_dir / _STDOUT_FILE, handle_stdout)
             _replay_stream(self._entry_dir / _STDERR_FILE, handle_stderr)
             return
+
+        _logger.debug(
+            "cache miss %s (%s/%s)",
+            self._key[:12],
+            self._metadata.package,
+            self._metadata.name,
+        )
 
         assert self._staging_dir is not None
         # Swap the base execution's output directory to the staging dir so the
