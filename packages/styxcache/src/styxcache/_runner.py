@@ -162,6 +162,17 @@ class _CachingExecution(Execution):
         assert self._entry_dir is not None
 
         if self._is_hit:
+            # Bump mtime on hit so downstream GC scripts can evict LRU-style
+            # (e.g. `find <cache_dir> -mtime +N -type d -exec rm -rf {} +`).
+            # This clobbers the creation timestamp, which we've decided is
+            # an acceptable trade for actionable "last used" information.
+            try:
+                os.utime(self._entry_dir, None)
+            except OSError:
+                # Filesystem refused the utime call (read-only mount,
+                # permissions). Caching still works; GC just falls back to
+                # FIFO by creation time.
+                pass
             _replay_stream(self._entry_dir / _STDOUT_FILE, handle_stdout)
             _replay_stream(self._entry_dir / _STDERR_FILE, handle_stderr)
             return
