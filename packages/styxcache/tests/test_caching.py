@@ -390,6 +390,37 @@ def test_stdout_persist_files_are_gzipped(tmp_path: pathlib.Path) -> None:
     assert "stdout-line-2\n" in content
 
 
+def test_cache_hit_bumps_entry_mtime_for_lru(tmp_path: pathlib.Path) -> None:
+    """Cache hit bumps mtime for LRU eviction.
+
+    On a cache hit the entry directory's mtime advances to 'now' so
+    downstream GC can evict least-recently-used entries.
+    """
+    import os
+    import time
+
+    in_file = tmp_path / "input.txt"
+    in_file.write_text("alpha")
+    base = _FakeRunner(tmp_path / "base")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    _wrapper(cache, in_file, {"flag": 1})
+
+    # Locate the committed entry and backdate its mtime.
+    entries = [
+        d for d in (tmp_path / "cache").rglob("*") if d.is_dir() and len(d.name) == 64
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+    old_time = time.time() - 3600  # one hour ago
+    os.utime(entry, (old_time, old_time))
+    assert entry.stat().st_mtime == pytest.approx(old_time, abs=1)
+
+    # A cache hit should bump mtime back to (approximately) now.
+    _wrapper(cache, in_file, {"flag": 1})
+    assert entry.stat().st_mtime > old_time + 60
+
+
 def test_local_runner_integration(tmp_path: pathlib.Path) -> None:
     """End-to-end against the real styxdefs.LocalRunner.
 
