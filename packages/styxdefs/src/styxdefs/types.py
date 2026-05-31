@@ -54,6 +54,28 @@ class Execution(typing.Protocol):
         """
         ...
 
+    def mutable_copy(self, host_file: InputPathType) -> OutputPathType:
+        """Return the host path of the writable copy staged for a mutable input.
+
+        A mutable input is one the tool modifies in place. The command line is
+        wired via `input_file(host_file, mutable=True)`, which makes the runner
+        stage a writable copy (the original is never touched). This method
+        returns that same copy's host path so the caller can read the modified
+        result as an output. Idempotent and consistent with the matching
+        `input_file(..., mutable=True)` call (both resolve the same copy).
+
+        Args:
+            host_file: The input file path on the host system.
+
+        Returns:
+            OutputPathType: A host filepath to the writable, staged copy.
+
+        Note:
+            Called (potentially multiple times) after
+            `Runner.start_execution()` and before `Runner.run()`.
+        """
+        ...
+
     def params(self, params: dict) -> dict:
         """Process tool parameters.
 

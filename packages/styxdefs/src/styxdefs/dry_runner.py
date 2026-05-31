@@ -33,6 +33,10 @@ class DryRunner(Runner, Execution):
         """Resolve output file."""
         return pathlib.Path(local_file)
 
+    def mutable_copy(self, host_file: InputPathType) -> OutputPathType:
+        """Resolve a mutable input's copy (no copy made in a dry run)."""
+        return pathlib.Path(host_file)
+
     def params(self, params: dict) -> dict:
         """Process tool parameters."""
         self.last_params = params
