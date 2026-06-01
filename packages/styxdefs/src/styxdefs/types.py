@@ -173,6 +173,8 @@ class StyxRuntimeError(Exception):
     Attributes:
         return_code: The return code of the failed command.
         command_args: The arguments of the failed command.
+        stdout_tail: The last captured lines of stdout, if any.
+        stderr_tail: The last captured lines of stderr, if any.
     """
 
     def __init__(
@@ -180,6 +182,8 @@ class StyxRuntimeError(Exception):
         return_code: int | None = None,
         command_args: list[str] | None = None,
         message_extra: str | None = None,
+        stdout_tail: list[str] | None = None,
+        stderr_tail: list[str] | None = None,
     ) -> None:
         """Initialize the error.
 
@@ -187,9 +191,13 @@ class StyxRuntimeError(Exception):
             return_code: The return code of the failed command.
             command_args: The arguments of the failed command.
             message_extra: Additional error message.
+            stdout_tail: Trailing stdout lines to surface in the message.
+            stderr_tail: Trailing stderr lines to surface in the message.
         """
         self.return_code = return_code
         self.command_args = command_args
+        self.stdout_tail = stdout_tail
+        self.stderr_tail = stderr_tail
 
         if return_code is not None:
             message = f"Command failed with return code {return_code}."
@@ -201,6 +209,15 @@ class StyxRuntimeError(Exception):
 
         if message_extra is not None:
             message += f"\n{message_extra}"
+
+        # stdout and stderr are surfaced together (tools are inconsistent about
+        # which they use for diagnostics), so a failure is debuggable without
+        # re-running at a higher log level.
+        for label, tail in (("stdout", stdout_tail), ("stderr", stderr_tail)):
+            if tail:
+                message += f"\n- Last {len(tail)} {label} line(s):\n" + "\n".join(
+                    f"    {line}" for line in tail
+                )
 
         super().__init__(message)
 

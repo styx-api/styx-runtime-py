@@ -1,9 +1,12 @@
 """Test the local runner."""
 
+import logging
 import os
 import pathlib
 import stat
+import sys
 
+import pytest
 import styxdefs
 
 
@@ -72,3 +75,28 @@ def test_local_mutable_basename_collision_suffixed(tmp_path: pathlib.Path) -> No
     x._copy_mutable_inputs()  # type: ignore[attr-defined]
     assert (x.output_dir / "scan.nii").read_text() == "a"  # type: ignore[attr-defined]
     assert (x.output_dir / "scan_1.nii").read_text() == "b"  # type: ignore[attr-defined]
+
+
+def test_stderr_is_not_logged_as_error(
+    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A tool writing diagnostics to stderr must not surface as error logs."""
+    x = _execution(tmp_path)
+    with caplog.at_level(logging.DEBUG, logger="styx_local_runner"):
+        x.run([sys.executable, "-c", "import sys; sys.stderr.write('diagnostic\\n')"])
+
+    # stdout and stderr both log below WARNING (no scary error-level records)...
+    assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+    # ...and the stderr line is still captured (just not as an error).
+    assert any("diagnostic" in r.getMessage() for r in caplog.records)
+
+
+def test_failure_surfaces_stream_tail(tmp_path: pathlib.Path) -> None:
+    """A non-zero exit attaches the stderr tail to the raised error."""
+    x = _execution(tmp_path)
+    script = "import sys; sys.stderr.write('boom\\n'); sys.exit(3)"
+    with pytest.raises(styxdefs.StyxRuntimeError) as exc:
+        x.run([sys.executable, "-c", script])
+    assert exc.value.return_code == 3
+    assert "boom" in str(exc.value)
+    assert exc.value.stderr_tail == ["boom"]

@@ -26,6 +26,14 @@ from .types import (
 class _LocalExecution(Execution):
     """Local execution object."""
 
+    output_tail_lines: typing.ClassVar[int] = 40
+    """Number of trailing stdout/stderr lines attached to failures.
+
+    Captured from both streams because tools are inconsistent about which one
+    they use for diagnostics (FSL/AFNI/ANTs mostly write to stderr; others put
+    useful error context on stdout).
+    """
+
     def __init__(
         self,
         logger: logging.Logger,
@@ -136,12 +144,25 @@ class _LocalExecution(Execution):
         self._copy_mutable_inputs()
         self.logger.debug(f"Running command: {shlex.join(cargs)}")
 
-        _stdout_handler = (
-            handle_stdout if handle_stdout else lambda line: self.logger.info(line)
-        )
-        _stderr_handler = (
-            handle_stderr if handle_stderr else lambda line: self.logger.error(line)
-        )
+        # Tool output is quiet by default (debug), and stdout/stderr log at the
+        # same level: many tools write diagnostics to stderr, so treating that
+        # stream as error-level is misleading. Stream identity is preserved in
+        # the child logger name. On failure the last N lines of both streams are
+        # attached to the raised error so users need not re-run at DEBUG.
+        stdout_logger = self.logger.getChild("stdout")
+        stderr_logger = self.logger.getChild("stderr")
+        user_stdout_handler = handle_stdout or (lambda line: stdout_logger.debug(line))
+        user_stderr_handler = handle_stderr or (lambda line: stderr_logger.debug(line))
+        stdout_tail: deque[str] = deque(maxlen=self.output_tail_lines)
+        stderr_tail: deque[str] = deque(maxlen=self.output_tail_lines)
+
+        def _stdout_handler(line: str) -> None:
+            stdout_tail.append(line)
+            user_stdout_handler(line)
+
+        def _stderr_handler(line: str) -> None:
+            stderr_tail.append(line)
+            user_stderr_handler(line)
 
         time_start = datetime.now()
         with Popen(
@@ -161,7 +182,12 @@ class _LocalExecution(Execution):
         time_end = datetime.now()
         self.logger.info(f"Executed {self.metadata.name} in {time_end - time_start}")
         if return_code:
-            raise StyxRuntimeError(return_code, cargs)
+            raise StyxRuntimeError(
+                return_code,
+                cargs,
+                stdout_tail=list(stdout_tail),
+                stderr_tail=list(stderr_tail),
+            )
 
 
 class LocalRunner(Runner):
