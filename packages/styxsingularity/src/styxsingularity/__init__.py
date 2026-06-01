@@ -143,6 +143,7 @@ class SingularityRunner(BaseContainerRunner):
 
     def __init__(
         self,
+        *,
         image_overrides: dict[str, str] | None = None,
         singularity_executable: str = "singularity",
         singularity_extra_args: list[str] | None = None,

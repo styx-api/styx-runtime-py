@@ -55,6 +55,7 @@ class _LocalExecution(Execution):
     def input_file(
         self,
         host_file: InputPathType,
+        *,
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
@@ -69,7 +70,7 @@ class _LocalExecution(Execution):
             return self._mutable_staged_name(host_file)
         return str(pathlib.Path(host_file).absolute())
 
-    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
+    def output_file(self, local_file: str, *, optional: bool = False) -> OutputPathType:
         """Resolve local output files."""
         return self.output_dir / local_file
 
@@ -126,6 +127,7 @@ class _LocalExecution(Execution):
     def run(
         self,
         cargs: list[str],
+        *,
         handle_stdout: typing.Callable[[str], None] | None = None,
         handle_stderr: typing.Callable[[str], None] | None = None,
     ) -> None:
@@ -168,6 +170,7 @@ class LocalRunner(Runner):
 
     def __init__(
         self,
+        *,
         data_dir: InputPathType | None = None,
         environ: dict[str, str] | None = None,
     ) -> None:

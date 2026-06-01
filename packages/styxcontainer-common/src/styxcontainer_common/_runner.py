@@ -23,6 +23,7 @@ class BaseContainerRunner(Runner):
 
     def __init__(
         self,
+        *,
         image_overrides: dict[str, str] | None = None,
         data_dir: InputPathType | None = None,
         environ: dict[str, str] | None = None,

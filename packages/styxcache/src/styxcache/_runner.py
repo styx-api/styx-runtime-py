@@ -59,6 +59,7 @@ class CachingRunner(Runner):
         self,
         base: Runner,
         cache_dir: str | os.PathLike[str],
+        *,
         policy: CachePolicy | None = None,
     ) -> None:
         """Create a CachingRunner.
@@ -122,10 +123,13 @@ class _CachingExecution(Execution):
     def input_file(
         self,
         host_file: InputPathType,
+        *,
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
-        local = self._base.input_file(host_file, resolve_parent, mutable)
+        local = self._base.input_file(
+            host_file, resolve_parent=resolve_parent, mutable=mutable
+        )
         host_path = pathlib.Path(host_file)
         canon = _canon(host_path)
 
@@ -144,7 +148,7 @@ class _CachingExecution(Execution):
         )
         return local
 
-    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
+    def output_file(self, local_file: str, *, optional: bool = False) -> OutputPathType:
         self._ensure_key_computed()
         assert self._entry_dir is not None
         return self._entry_dir / local_file
@@ -170,6 +174,7 @@ class _CachingExecution(Execution):
     def run(
         self,
         cargs: list[str],
+        *,
         handle_stdout: typing.Callable[[str], None] | None = None,
         handle_stderr: typing.Callable[[str], None] | None = None,
     ) -> None:
@@ -238,7 +243,9 @@ class _CachingExecution(Execution):
         try:
             self._base.output_dir = self._staging_dir  # type: ignore[attr-defined]
             try:
-                self._base.run(cargs, _tee_stdout, _tee_stderr)
+                self._base.run(
+                    cargs, handle_stdout=_tee_stdout, handle_stderr=_tee_stderr
+                )
             except BaseException:
                 self._runner.store.discard(self._staging_dir)
                 raise

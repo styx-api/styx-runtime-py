@@ -63,6 +63,7 @@ class BaseContainerExecution(Execution):
     def input_file(
         self,
         host_file: InputPathType,
+        *,
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
@@ -108,7 +109,7 @@ class BaseContainerExecution(Execution):
         self.input_file_next_id += 1
         return resolved_file
 
-    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
+    def output_file(self, local_file: str, *, optional: bool = False) -> OutputPathType:
         """Resolve output file path on the host filesystem."""
         return self.output_dir / local_file
 
@@ -167,6 +168,7 @@ class BaseContainerExecution(Execution):
     def run(
         self,
         cargs: list[str],
+        *,
         handle_stdout: typing.Callable[[str], None] | None = None,
         handle_stderr: typing.Callable[[str], None] | None = None,
     ) -> None:

@@ -19,6 +19,7 @@ class Execution(typing.Protocol):
     def input_file(
         self,
         host_file: InputPathType,
+        *,
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
@@ -42,7 +43,7 @@ class Execution(typing.Protocol):
         """
         ...
 
-    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
+    def output_file(self, local_file: str, *, optional: bool = False) -> OutputPathType:
         """Resolve local output files.
 
         Args:
@@ -97,6 +98,7 @@ class Execution(typing.Protocol):
     def run(
         self,
         cargs: list[str],
+        *,
         handle_stdout: typing.Callable[[str], None] | None = None,
         handle_stderr: typing.Callable[[str], None] | None = None,
     ) -> None:

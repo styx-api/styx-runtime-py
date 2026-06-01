@@ -120,14 +120,17 @@ class _GraphExecution(Execution):
     def input_file(
         self,
         host_file: InputPathType,
+        *,
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
         self.input_files.append(Path(host_file))
-        return self.base.input_file(host_file, resolve_parent, mutable)
+        return self.base.input_file(
+            host_file, resolve_parent=resolve_parent, mutable=mutable
+        )
 
-    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
-        output_file = self.base.output_file(local_file, optional)
+    def output_file(self, local_file: str, *, optional: bool = False) -> OutputPathType:
+        output_file = self.base.output_file(local_file, optional=optional)
         self.output_files.append(Path(output_file))
         return output_file
 
@@ -145,6 +148,7 @@ class _GraphExecution(Execution):
     def run(
         self,
         cargs: list[str],
+        *,
         handle_stdout: typing.Callable[[str], None] | None = None,
         handle_stderr: typing.Callable[[str], None] | None = None,
     ) -> None:
@@ -159,7 +163,9 @@ class _GraphExecution(Execution):
 class GraphRunner(Runner, Generic[T]):
     """Runner that builds and maintains a dependency graph."""
 
-    def __init__(self, base: T, graph_style: GraphStyle = GraphStyle.TOP_DOWN) -> None:
+    def __init__(
+        self, base: T, *, graph_style: GraphStyle = GraphStyle.TOP_DOWN
+    ) -> None:
         """Create GraphRunner."""
         self.base = base
         self.nodes: list[Node] = []

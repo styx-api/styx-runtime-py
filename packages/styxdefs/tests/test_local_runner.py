@@ -27,7 +27,7 @@ def test_local_runner(tmp_path: pathlib.Path) -> None:
     input_file = x.input_file("abc")
     output_file = x.output_file("def")
     if os.name == "posix":
-        x.run(["ls"], None, None)
+        x.run(["ls"])
 
     assert pathlib.Path(input_file).name == "abc"
     assert output_file.is_relative_to(tmp_path / "xyz")

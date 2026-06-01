@@ -23,13 +23,14 @@ class DryRunner(Runner, Execution):
     def input_file(
         self,
         host_file: InputPathType,
+        *,
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
         """Resolve input file."""
         return str(host_file)
 
-    def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
+    def output_file(self, local_file: str, *, optional: bool = False) -> OutputPathType:
         """Resolve output file."""
         return pathlib.Path(local_file)
 
@@ -45,6 +46,7 @@ class DryRunner(Runner, Execution):
     def run(
         self,
         cargs: list[str],
+        *,
         handle_stdout: typing.Callable[[str], None] | None = None,
         handle_stderr: typing.Callable[[str], None] | None = None,
     ) -> None:

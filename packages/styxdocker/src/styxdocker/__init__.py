@@ -138,6 +138,7 @@ class DockerRunner(BaseContainerRunner):
 
     def __init__(
         self,
+        *,
         image_overrides: dict[str, str] | None = None,
         docker_executable: str = "docker",
         docker_extra_args: list[str] | None = None,
