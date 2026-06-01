@@ -27,7 +27,11 @@ class Execution(typing.Protocol):
         Args:
             host_file: The input file path on the host system.
             resolve_parent: If True, resolve the parent directory of the input file.
-            mutable: If True, the input file may be written to during execution.
+                Ignored when ``mutable`` is True (a mutable input is staged as a
+                standalone writable copy, not mounted in place).
+            mutable: If True, the input is staged as a writable copy that the
+                tool may edit in place; the original host file is never touched.
+                The same copy is surfaced as an output via `mutable_copy`.
 
         Returns:
             str: A local filepath.
@@ -71,8 +75,11 @@ class Execution(typing.Protocol):
             OutputPathType: A host filepath to the writable, staged copy.
 
         Note:
-            Called (potentially multiple times) after
-            `Runner.start_execution()` and before `Runner.run()`.
+            Called (potentially multiple times) after all
+            `Execution.input_file()` calls and before `Runner.run()`. Like
+            `output_file`, middleware may use this call to finalise execution
+            state (e.g. a content-addressed cache key), so it must not run
+            before every `input_file` has been recorded.
         """
         ...
 

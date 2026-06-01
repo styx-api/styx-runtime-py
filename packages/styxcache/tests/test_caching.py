@@ -220,6 +220,79 @@ def test_mutable_copy_invalidated_by_content(tmp_path: pathlib.Path) -> None:
     assert out.read_text() == "changed"
 
 
+def test_multiple_mutable_inputs_commit_distinctly(tmp_path: pathlib.Path) -> None:
+    f1 = tmp_path / "a.nii"
+    f1.write_text("aaa")
+    f2 = tmp_path / "b.nii"
+    f2.write_text("bbb")
+    base = _FakeRunner(tmp_path / "base")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    metadata = Metadata(
+        id="test-tool.v1",
+        name="test-tool",
+        package="testpkg",
+        container_image_tag="example/test:1.0",
+    )
+    execution = cache.start_execution(metadata)
+    execution.params({"a": f1, "b": f2})
+    cargs = [
+        "test-tool",
+        execution.input_file(f1, mutable=True),
+        execution.input_file(f2, mutable=True),
+    ]
+    out1 = execution.mutable_copy(f1)
+    out2 = execution.mutable_copy(f2)
+    execution.run(cargs)
+
+    # Each mutable input commits as its own distinct file in the cache entry.
+    assert out1 != out2
+    assert (tmp_path / "cache") in out1.parents
+    assert (tmp_path / "cache") in out2.parents
+    assert out1.read_text() == "aaa"
+    assert out2.read_text() == "bbb"
+
+
+def test_real_local_runner_mutable_through_cache(tmp_path: pathlib.Path) -> None:
+    """End-to-end: a real LocalRunner edits a mutable copy under the cache.
+
+    Exercises the output-dir swap that the deferred-copy fix targets: the
+    staged copy must land in the swapped (staging) dir so it commits into the
+    cache entry, never touching the caller's original.
+    """
+    in_file = tmp_path / "scan.txt"
+    in_file.write_text("orig")
+    base = LocalRunner(data_dir=tmp_path / "local")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    # Edits the file it is given (relative to cwd) in place, like a real tool.
+    edit_script = (
+        "import pathlib, sys; p = pathlib.Path(sys.argv[1]); "
+        "p.write_text(p.read_text() + '-edited')"
+    )
+
+    def _run_once() -> OutputPathType:
+        metadata = Metadata(id="edit.v1", name="edit", package="pkg")
+        execution = cache.start_execution(metadata)
+        execution.params({"in_file": in_file})
+        staged = execution.input_file(in_file, mutable=True)
+        out = execution.mutable_copy(in_file)
+        execution.run([sys.executable, "-c", edit_script, staged])
+        return out
+
+    out1 = _run_once()
+    out2 = _run_once()
+
+    # The mutated copy is committed into the cache entry, not the local dir.
+    assert (tmp_path / "cache") in out1.parents
+    assert out1.read_text() == "orig-edited"
+    # The caller's original is never touched.
+    assert in_file.read_text() == "orig"
+    # Second call hits: the tool does not re-run, so the copy is edited once.
+    assert out1 == out2
+    assert out2.read_text() == "orig-edited"
+
+
 def test_same_content_different_host_path_is_hit(tmp_path: pathlib.Path) -> None:
     a = tmp_path / "a.txt"
     b = tmp_path / "b.txt"

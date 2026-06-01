@@ -47,7 +47,10 @@ class BaseContainerExecution(Execution):
         self.metadata = metadata
         self.container_tag = container_tag
         self.environ = environ
-        self.input_mounts: list[tuple[pl.Path, str, bool]] = []
+        # (host path, in-container path) bind mounts; all read-only. Mutable
+        # inputs do not appear here - they are staged as writable copies inside
+        # the output dir (see mutable_stages / input_file).
+        self.input_mounts: list[tuple[pl.Path, str]] = []
         self.input_file_next_id = 0
         # Mutable inputs, keyed by absolute source path -> staged basename.
         # The writable copy lives inside the output dir (mounted read-write at
@@ -90,7 +93,7 @@ class BaseContainerExecution(Execution):
                 f"/styx_input/{self.input_file_next_id}/{_host_file_parent.name}"
             )
             resolved_file = f"{local_file}/{_host_file.name}"
-            self.input_mounts.append((_host_file_parent, local_file, mutable))
+            self.input_mounts.append((_host_file_parent, local_file))
         else:
             if not _host_file.exists():
                 # See note above. We don't know if the 'file' here is a
@@ -100,7 +103,7 @@ class BaseContainerExecution(Execution):
             resolved_file = local_file = (
                 f"/styx_input/{self.input_file_next_id}/{_host_file.name}"
             )
-            self.input_mounts.append((_host_file, local_file, mutable))
+            self.input_mounts.append((_host_file, local_file))
 
         self.input_file_next_id += 1
         return resolved_file
