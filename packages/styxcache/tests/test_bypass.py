@@ -26,6 +26,9 @@ class _FakeExecution(Execution):
     def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
         return self.output_dir / local_file
 
+    def mutable_copy(self, host_file: InputPathType) -> OutputPathType:
+        return self.output_dir / pathlib.Path(host_file).name
+
     def params(self, params: dict) -> dict:
         return params
 

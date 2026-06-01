@@ -131,6 +131,14 @@ class _GraphExecution(Execution):
         self.output_files.append(Path(output_file))
         return output_file
 
+    def mutable_copy(self, host_file: InputPathType) -> OutputPathType:
+        # A mutable input is both consumed (the original) and produced (the
+        # writable copy), so it contributes an input and an output edge.
+        self.input_files.append(Path(host_file))
+        output_file = self.base.mutable_copy(host_file)
+        self.output_files.append(Path(output_file))
+        return output_file
+
     def params(self, params: dict) -> dict:
         return self.base.params(params)
 

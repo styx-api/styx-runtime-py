@@ -47,10 +47,12 @@ class CachingRunner(Runner):
     * Environment variables named in :attr:`CachePolicy.env_allowlist`.
     * :attr:`CachePolicy.extra` user-space invalidation fields.
 
-    Notes on ``mutable=True`` inputs: the key captures pre-run content, so a
-    cache hit will skip re-mutating the host file. Pair this runner with a
-    base that copies mutable inputs before mounting to avoid surprising
-    callers that rely on in-place mutation.
+    Notes on ``mutable=True`` inputs: the base runner stages a writable copy
+    (the caller's original is never touched) and surfaces it through
+    :meth:`Execution.mutable_copy`. That copy is committed into the cache entry
+    like any other output, so a cache hit replays the previously-mutated copy
+    rather than re-running. The key captures the input's pre-run content hash,
+    so distinct source contents miss and re-stage.
     """
 
     def __init__(
@@ -146,6 +148,19 @@ class _CachingExecution(Execution):
         self._ensure_key_computed()
         assert self._entry_dir is not None
         return self._entry_dir / local_file
+
+    def mutable_copy(self, host_file: InputPathType) -> OutputPathType:
+        # A mutable input's writable copy is, to the cache, just another output
+        # file: the base stages it into its output dir (swapped to the staging
+        # dir during run, committed into the entry dir on success). Let the base
+        # own the staged basename, then relocate it into the cache entry so the
+        # path handed back matches the committed location - the same scheme
+        # output_file uses. The matching input_file(..., mutable=True) call is
+        # what feeds the cache key (see the input record's "mutable" flag).
+        base_copy = self._base.mutable_copy(host_file)
+        self._ensure_key_computed()
+        assert self._entry_dir is not None
+        return self._entry_dir / base_copy.name
 
     def params(self, params: dict) -> dict:
         normalised = self._base.params(params)

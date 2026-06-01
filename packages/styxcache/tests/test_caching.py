@@ -26,6 +26,7 @@ class _FakeExecution(Execution):
         self.metadata = metadata
         self.run_count = 0
         self._outputs: list[str] = []
+        self._mutables: list[pathlib.Path] = []
 
     def input_file(
         self,
@@ -38,6 +39,11 @@ class _FakeExecution(Execution):
     def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
         self._outputs.append(local_file)
         return self.output_dir / local_file
+
+    def mutable_copy(self, host_file: InputPathType) -> OutputPathType:
+        src = pathlib.Path(host_file)
+        self._mutables.append(src)
+        return self.output_dir / src.name
 
     def params(self, params: dict) -> dict:
         return params
@@ -52,6 +58,10 @@ class _FakeExecution(Execution):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         # Produce a deterministic output the caller can read back.
         (self.output_dir / "result.txt").write_text("ran\n")
+        # Stage writable copies of mutable inputs into the (possibly swapped)
+        # output dir, mirroring how a real base runner copies-on-mount.
+        for src in self._mutables:
+            (self.output_dir / src.name).write_text(src.read_text())
         # Emit deterministic stdout/stderr lines so tests can assert on
         # persistence and replay semantics.
         if handle_stdout is not None:
@@ -146,6 +156,68 @@ def test_different_params_invalidate(tmp_path: pathlib.Path) -> None:
     _wrapper(cache, in_file, {"flag": 2})
 
     assert base.total_runs == 2
+
+
+def _wrapper_mutable(runner: Runner, in_file: pathlib.Path) -> OutputPathType:
+    """Mimics a generated flow for a tool that edits its input in place."""
+    metadata = Metadata(
+        id="test-tool.v1",
+        name="test-tool",
+        package="testpkg",
+        container_image_tag="example/test:1.0",
+    )
+    execution = runner.start_execution(metadata)
+    execution.params({"in_file": in_file})
+    # cargs wire the writable copy; the same copy is surfaced as an output.
+    cargs = ["test-tool", execution.input_file(in_file, mutable=True)]
+    out = execution.mutable_copy(in_file)
+    execution.run(cargs)
+    return out
+
+
+def test_mutable_copy_committed_into_cache_entry(tmp_path: pathlib.Path) -> None:
+    in_file = tmp_path / "scan.nii"
+    in_file.write_text("orig")
+    base = _FakeRunner(tmp_path / "base")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    out1 = _wrapper_mutable(cache, in_file)
+
+    # The staged copy is relocated into the cache entry, not the base dir.
+    assert (tmp_path / "cache") in out1.parents
+    assert (tmp_path / "base") not in out1.parents
+    assert out1.read_text() == "orig"
+
+
+def test_mutable_copy_replayed_on_cache_hit(tmp_path: pathlib.Path) -> None:
+    in_file = tmp_path / "scan.nii"
+    in_file.write_text("orig")
+    base = _FakeRunner(tmp_path / "base")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    out1 = _wrapper_mutable(cache, in_file)
+    out2 = _wrapper_mutable(cache, in_file)
+
+    # Second call is a hit (base never re-runs), same committed copy returned.
+    assert base.total_runs == 1
+    assert out1 == out2
+    assert out2.read_text() == "orig"
+
+
+def test_mutable_copy_invalidated_by_content(tmp_path: pathlib.Path) -> None:
+    in_file = tmp_path / "scan.nii"
+    in_file.write_text("orig")
+    base = _FakeRunner(tmp_path / "base")
+    cache = CachingRunner(base, cache_dir=tmp_path / "cache")
+
+    _wrapper_mutable(cache, in_file)
+    in_file.write_text("changed")
+    out = _wrapper_mutable(cache, in_file)
+
+    # The input_file(mutable=True) content hash feeds the key, so a changed
+    # source misses and re-stages the new content.
+    assert base.total_runs == 2
+    assert out.read_text() == "changed"
 
 
 def test_same_content_different_host_path_is_hit(tmp_path: pathlib.Path) -> None:
