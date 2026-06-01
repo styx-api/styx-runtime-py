@@ -9,6 +9,7 @@ import os
 
 from ._errors import StyxContainerError
 from ._execution import BaseContainerExecution
+from ._mounts import oci_mount
 from ._runner import BaseContainerRunner
 
 if os.name == "posix":
@@ -21,4 +22,5 @@ __all__ = [
     "BaseContainerExecution",
     "BaseContainerRunner",
     "StyxContainerError",
+    "oci_mount",
 ]

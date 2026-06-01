@@ -87,8 +87,11 @@ class Execution(typing.Protocol):
     def params(self, params: dict) -> dict:
         """Process tool parameters.
 
-        This is called by wrappers once before command-line arguments are built.
-        Parameters may be logged, cached, or modified.
+        This is called by wrappers once before command-line arguments are built,
+        as a hook to observe parameters (e.g. log them or fold them into a cache
+        key). Generated wrappers invoke it for its side effects and do not
+        consume the return value, so an implementation cannot rewrite the
+        parameters the wrapper goes on to use.
 
         Args:
             params: Tool parameters.

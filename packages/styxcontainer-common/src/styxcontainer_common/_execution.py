@@ -220,8 +220,9 @@ class BaseContainerExecution(Execution):
         with Popen(runtime_command, text=True, stdout=PIPE, stderr=PIPE) as process:
             with ThreadPoolExecutor(2) as pool:  # two threads to handle the streams
                 exhaust = partial(pool.submit, partial(deque, maxlen=0))
-                exhaust(_stdout_handler(line[:-1]) for line in process.stdout)  # type: ignore
-                exhaust(_stderr_handler(line[:-1]) for line in process.stderr)  # type: ignore
+                out, err = process.stdout, process.stderr
+                exhaust(_stdout_handler(line.removesuffix("\n")) for line in out)  # type: ignore
+                exhaust(_stderr_handler(line.removesuffix("\n")) for line in err)  # type: ignore
         return_code = process.poll()
         time_end = datetime.now()
         self.logger.info(

@@ -127,6 +127,14 @@ class _CachingExecution(Execution):
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
+        if self._key is not None:
+            # The cache key folds in every input record, and it is frozen by the
+            # first output_file/mutable_copy/run call. An input registered after
+            # that would silently not affect the key -> wrong cache entry.
+            raise RuntimeError(
+                "input_file() called after the cache key was computed; all "
+                "inputs must be registered before output_file/mutable_copy/run."
+            )
         local = self._base.input_file(
             host_file, resolve_parent=resolve_parent, mutable=mutable
         )

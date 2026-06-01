@@ -9,18 +9,9 @@ from styxcontainer_common import (
     BaseContainerExecution,
     BaseContainerRunner,
     StyxContainerError,
+    oci_mount,
 )
 from styxdefs import Execution, InputPathType, Metadata
-
-
-def _podman_mount(host_path: str, container_path: str, readonly: bool) -> str:
-    """Construct Podman mount argument."""
-    host_path = host_path.replace('"', r"\"")
-    container_path = container_path.replace('"', r"\"")
-    host_path = host_path.replace("\\", "\\\\")
-    container_path = container_path.replace("\\", "\\\\")
-    readonly_str = ",readonly" if readonly else ""
-    return f"type=bind,source={host_path},target={container_path}{readonly_str}"
 
 
 class StyxPodmanError(StyxContainerError):
@@ -77,13 +68,11 @@ class _PodmanExecution(BaseContainerExecution):
         for host_file, local_file in self.input_mounts:
             mounts += [
                 "--mount",
-                _podman_mount(
-                    host_file.absolute().as_posix(), local_file, readonly=True
-                ),
+                oci_mount(host_file.absolute().as_posix(), local_file, readonly=True),
             ]
         mounts += [
             "--mount",
-            _podman_mount(
+            oci_mount(
                 self.output_dir.absolute().as_posix(), "/styx_output", readonly=False
             ),
         ]
