@@ -50,6 +50,26 @@ def test_build_command_passes_env_flags(tmp_path: pl.Path) -> None:
     assert "FOO=bar" in cmd
 
 
+def test_mutable_input_not_bind_mounted_and_output_writable(tmp_path: pl.Path) -> None:
+    runner = DockerRunner(data_dir=tmp_path)
+    exec_ = runner.start_execution(_metadata())
+    assert isinstance(exec_, _DockerExecution)
+
+    src = tmp_path / "scan.nii"
+    src.write_text("orig")
+
+    # The mutable input resolves into the writable output mount, not a
+    # read-only bind-mount of the original.
+    in_container = exec_.input_file(src, mutable=True)
+    assert in_container == "/styx_output/scan.nii"
+    assert exec_.input_mounts == []
+
+    cmd = exec_._build_command(["tool", in_container])
+    assert src.absolute().as_posix() not in " ".join(cmd)
+    out_mount = next(m for m in cmd if "target=/styx_output" in m)
+    assert "readonly" not in out_mount
+
+
 def test_error_label(tmp_path: pl.Path) -> None:
     err = StyxDockerError(
         return_code=1, command_args=["x"], docker_args=["docker", "run"]

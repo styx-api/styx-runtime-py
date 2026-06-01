@@ -57,6 +57,25 @@ def test_build_command_uses_bind_flag(tmp_path: pl.Path) -> None:
     assert "--mount" not in cmd
 
 
+def test_mutable_input_not_bind_mounted_and_output_writable(tmp_path: pl.Path) -> None:
+    runner = SingularityRunner(data_dir=tmp_path)
+    exec_ = runner.start_execution(_metadata())
+    assert isinstance(exec_, _SingularityExecution)
+
+    src = tmp_path / "scan.nii"
+    src.write_text("orig")
+
+    in_container = exec_.input_file(src, mutable=True)
+    assert in_container == "/styx_output/scan.nii"
+    assert exec_.input_mounts == []
+
+    cmd = exec_._build_command(["tool", in_container])
+    assert src.absolute().as_posix() not in " ".join(cmd)
+    # The output bind (host:/styx_output) is read-write (no ":ro" suffix).
+    out_bind = next(m for m in cmd if m.endswith(":/styx_output"))
+    assert not out_bind.endswith(":ro")
+
+
 def test_error_label() -> None:
     err = StyxSingularityError(
         return_code=1, command_args=["x"], singularity_args=["singularity", "exec"]

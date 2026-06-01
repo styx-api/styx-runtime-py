@@ -74,11 +74,11 @@ class _PodmanExecution(BaseContainerExecution):
 
     def _build_command(self, cargs: list[str]) -> list[str]:
         mounts: list[str] = []
-        for host_file, local_file, mutable in self.input_mounts:
+        for host_file, local_file in self.input_mounts:
             mounts += [
                 "--mount",
                 _podman_mount(
-                    host_file.absolute().as_posix(), local_file, readonly=not mutable
+                    host_file.absolute().as_posix(), local_file, readonly=True
                 ),
             ]
         mounts += [

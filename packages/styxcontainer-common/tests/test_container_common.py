@@ -1,6 +1,7 @@
 """Tests for styxcontainer_common."""
 
 import pathlib as pl
+import stat
 
 import pytest
 from styxcontainer_common import (
@@ -86,6 +87,92 @@ def test_input_file_missing_raises(tmp_path: pl.Path) -> None:
     exec_ = runner.start_execution(_metadata())
     with pytest.raises(FileNotFoundError):
         exec_.input_file(tmp_path / "missing")
+
+
+def test_mutable_input_resolves_to_output_mount(tmp_path: pl.Path) -> None:
+    runner = _FakeRunner(data_dir=tmp_path)
+    exec_ = runner.start_execution(_metadata())
+    assert isinstance(exec_, _FakeExecution)
+
+    src = tmp_path / "scan.nii"
+    src.write_text("orig")
+
+    # cargs path points at the copy inside the read-write output mount...
+    in_container = exec_.input_file(src, mutable=True)
+    assert in_container == "/styx_output/scan.nii"
+    # ...and the output handle resolves to that same copy on the host.
+    assert exec_.mutable_copy(src) == exec_.output_dir / "scan.nii"
+    # A mutable input is never bind-mounted from its original location.
+    assert exec_.input_mounts == []
+
+
+def test_mutable_input_missing_raises(tmp_path: pl.Path) -> None:
+    runner = _FakeRunner(data_dir=tmp_path)
+    exec_ = runner.start_execution(_metadata())
+    assert isinstance(exec_, _FakeExecution)
+    with pytest.raises(FileNotFoundError):
+        exec_.input_file(tmp_path / "missing.nii", mutable=True)
+
+
+def test_mutable_input_basename_collision_suffixed(tmp_path: pl.Path) -> None:
+    runner = _FakeRunner(data_dir=tmp_path)
+    exec_ = runner.start_execution(_metadata())
+    assert isinstance(exec_, _FakeExecution)
+
+    a = tmp_path / "a"
+    a.mkdir()
+    b = tmp_path / "b"
+    b.mkdir()
+    src_a = a / "scan.nii"
+    src_a.write_text("a")
+    src_b = b / "scan.nii"
+    src_b.write_text("b")
+
+    assert exec_.input_file(src_a, mutable=True) == "/styx_output/scan.nii"
+    assert exec_.input_file(src_b, mutable=True) == "/styx_output/scan_1.nii"
+    # Idempotent per source: the same source resolves to the same copy.
+    assert exec_.mutable_copy(src_a) == exec_.output_dir / "scan.nii"
+    assert exec_.mutable_copy(src_b) == exec_.output_dir / "scan_1.nii"
+
+
+def test_copy_mutable_inputs_stages_writable_copy(tmp_path: pl.Path) -> None:
+    runner = _FakeRunner(data_dir=tmp_path)
+    exec_ = runner.start_execution(_metadata())
+    assert isinstance(exec_, _FakeExecution)
+
+    src = tmp_path / "scan.nii"
+    src.write_text("orig")
+    src.chmod(0o444)  # read-only source
+
+    exec_.input_file(src, mutable=True)
+    exec_.output_dir.mkdir(parents=True, exist_ok=True)
+    exec_._copy_mutable_inputs()
+
+    copy = exec_.output_dir / "scan.nii"
+    assert copy.read_text() == "orig"
+    # The copy is owner-writable even though the source was read-only.
+    assert copy.stat().st_mode & stat.S_IWUSR
+    # Editing the copy leaves the caller's original untouched.
+    copy.write_text("edited")
+    assert src.read_text() == "orig"
+
+
+def test_copy_mutable_inputs_is_idempotent(tmp_path: pl.Path) -> None:
+    runner = _FakeRunner(data_dir=tmp_path)
+    exec_ = runner.start_execution(_metadata())
+    assert isinstance(exec_, _FakeExecution)
+
+    src = tmp_path / "scan.nii"
+    src.write_text("orig")
+
+    exec_.mutable_copy(src)
+    exec_.output_dir.mkdir(parents=True, exist_ok=True)
+    exec_._copy_mutable_inputs()
+    copy = exec_.output_dir / "scan.nii"
+    copy.write_text("edited")
+    # A second staging pass must not clobber an already-staged copy.
+    exec_._copy_mutable_inputs()
+    assert copy.read_text() == "edited"
 
 
 def test_output_file(tmp_path: pl.Path) -> None:

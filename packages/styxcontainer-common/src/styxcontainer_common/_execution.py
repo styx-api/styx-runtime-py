@@ -3,6 +3,8 @@
 import logging
 import pathlib as pl
 import shlex
+import shutil
+import stat
 import typing
 from abc import abstractmethod
 from collections import deque
@@ -45,8 +47,18 @@ class BaseContainerExecution(Execution):
         self.metadata = metadata
         self.container_tag = container_tag
         self.environ = environ
-        self.input_mounts: list[tuple[pl.Path, str, bool]] = []
+        # (host path, in-container path) bind mounts; all read-only. Mutable
+        # inputs do not appear here - they are staged as writable copies inside
+        # the output dir (see mutable_stages / input_file).
+        self.input_mounts: list[tuple[pl.Path, str]] = []
         self.input_file_next_id = 0
+        # Mutable inputs, keyed by absolute source path -> staged basename.
+        # The writable copy lives inside the output dir (mounted read-write at
+        # /styx_output), so input_file(mutable=True) and mutable_copy() resolve
+        # to the same file. Copies are materialised at run time (the cache
+        # middleware swaps output_dir before run, so an eager copy would land
+        # in the wrong directory).
+        self.mutable_stages: dict[str, str] = {}
 
     def input_file(
         self,
@@ -54,7 +66,16 @@ class BaseContainerExecution(Execution):
         resolve_parent: bool = False,
         mutable: bool = False,
     ) -> str:
-        """Resolve an input file and register the host path for mounting."""
+        """Resolve an input file and register the host path for mounting.
+
+        Mutable inputs are not bind-mounted from their original location.
+        Instead a writable copy is staged inside the output directory and the
+        in-container path of that copy is returned, so the tool edits the copy
+        in place and the caller's original file is never touched.
+        """
+        if mutable:
+            return f"/styx_output/{self._mutable_staged_name(host_file)}"
+
         _host_file = pl.Path(host_file)
 
         if resolve_parent:
@@ -72,7 +93,7 @@ class BaseContainerExecution(Execution):
                 f"/styx_input/{self.input_file_next_id}/{_host_file_parent.name}"
             )
             resolved_file = f"{local_file}/{_host_file.name}"
-            self.input_mounts.append((_host_file_parent, local_file, mutable))
+            self.input_mounts.append((_host_file_parent, local_file))
         else:
             if not _host_file.exists():
                 # See note above. We don't know if the 'file' here is a
@@ -82,7 +103,7 @@ class BaseContainerExecution(Execution):
             resolved_file = local_file = (
                 f"/styx_input/{self.input_file_next_id}/{_host_file.name}"
             )
-            self.input_mounts.append((_host_file, local_file, mutable))
+            self.input_mounts.append((_host_file, local_file))
 
         self.input_file_next_id += 1
         return resolved_file
@@ -90,6 +111,54 @@ class BaseContainerExecution(Execution):
     def output_file(self, local_file: str, optional: bool = False) -> OutputPathType:
         """Resolve output file path on the host filesystem."""
         return self.output_dir / local_file
+
+    def mutable_copy(self, host_file: InputPathType) -> OutputPathType:
+        """Return the host path of the writable copy staged for a mutable input.
+
+        Pairs with ``input_file(host_file, mutable=True)``: both resolve to the
+        same staged copy inside the output directory. The copy is materialised
+        at run time, so the returned path is only populated once :meth:`run`
+        has executed.
+        """
+        return self.output_dir / self._mutable_staged_name(host_file)
+
+    def _mutable_staged_name(self, host_file: InputPathType) -> str:
+        """Reserve (idempotently) the output-dir basename for a mutable input.
+
+        Distinct sources that share a basename get a suffixed name so they
+        never alias one file. Does not copy anything; copies happen in
+        :meth:`_copy_mutable_inputs` once the output directory is final.
+        """
+        src = pl.Path(host_file).absolute()
+        key = str(src)
+        existing = self.mutable_stages.get(key)
+        if existing is not None:
+            return existing
+        if not src.is_file():
+            raise FileNotFoundError(f'Mutable input file not found: "{src}"')
+        taken = set(self.mutable_stages.values())
+        name = src.name
+        counter = 1
+        while name in taken:
+            name = f"{src.stem}_{counter}{src.suffix}"
+            counter += 1
+        self.mutable_stages[key] = name
+        return name
+
+    def _copy_mutable_inputs(self) -> None:
+        """Stage writable copies of mutable inputs into the output directory.
+
+        Called at the start of :meth:`run`, when ``output_dir`` is final (the
+        cache middleware may have swapped it). The copy is made owner-writable
+        even when the source is read-only - the whole point is an editable copy
+        the tool can modify in place.
+        """
+        for src, name in self.mutable_stages.items():
+            dest = self.output_dir / name
+            if dest.exists():
+                continue
+            shutil.copy2(src, dest)
+            dest.chmod(dest.stat().st_mode | stat.S_IWUSR)
 
     def params(self, params: dict) -> dict:
         """Pass parameters through unchanged."""
@@ -109,6 +178,7 @@ class BaseContainerExecution(Execution):
         logger by default).
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._copy_mutable_inputs()
 
         run_script = self.output_dir / "run.sh"
         run_script.write_text(
