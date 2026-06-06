@@ -21,19 +21,17 @@ def test_use_dry_registers_and_returns() -> None:
 
 
 def test_use_docker_constructs_real_runner(tmp_path: pl.Path) -> None:
-    from styxdocker import DockerRunner
-
+    styxdocker = pytest.importorskip("styxdocker")
     runner = styxkit.use_docker(data_dir=tmp_path)
-    assert isinstance(runner, DockerRunner)
+    assert isinstance(runner, styxdocker.DockerRunner)
     assert get_global_runner() is runner
 
 
 def test_use_graph_wraps_current_global_runner(tmp_path: pl.Path) -> None:
-    from styxgraph import GraphRunner
-
+    styxgraph = pytest.importorskip("styxgraph")
     base = styxkit.use_local(data_dir=tmp_path)
     runner = styxkit.use_graph()
-    assert isinstance(runner, GraphRunner)
+    assert isinstance(runner, styxgraph.GraphRunner)
     assert runner.base is base
     assert get_global_runner() is runner
 
@@ -43,12 +41,28 @@ def test_missing_backend_raises_friendly(monkeypatch: pytest.MonkeyPatch) -> Non
 
     def fake_import(name: str, package: str | None = None) -> object:
         if name == "styxdocker":
-            raise ModuleNotFoundError("No module named 'styxdocker'")
+            # A real missing-package import sets exc.name to the package.
+            raise ModuleNotFoundError("No module named 'styxdocker'", name="styxdocker")
         return real_import(name, package)
 
     monkeypatch.setattr(importlib, "import_module", fake_import)
     with pytest.raises(ModuleNotFoundError, match=r"styxkit\[docker\]"):
         styxkit.use_docker()
+
+
+def test_transitive_import_error_is_not_masked(monkeypatch: pytest.MonkeyPatch) -> None:
+    # An installed backend whose own (transitive) dependency is missing must
+    # surface as-is, not be relabeled "install styxkit[docker]".
+    def fake_import(name: str, package: str | None = None) -> object:
+        raise ModuleNotFoundError(
+            "No module named 'styxcontainer_common'", name="styxcontainer_common"
+        )
+
+    monkeypatch.setattr(importlib, "import_module", fake_import)
+    with pytest.raises(ModuleNotFoundError) as excinfo:
+        styxkit.use_docker()
+    assert excinfo.value.name == "styxcontainer_common"
+    assert "styxkit[docker]" not in str(excinfo.value)
 
 
 def test_resolve_runner_passthrough() -> None:

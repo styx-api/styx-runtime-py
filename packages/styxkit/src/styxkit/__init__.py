@@ -69,6 +69,12 @@ def _runner_factory(kind: str) -> typing.Callable[..., Runner]:
     try:
         module = importlib.import_module(backend.module)
     except ModuleNotFoundError as exc:
+        # Only translate the backend package being absent. A ModuleNotFoundError
+        # naming something else means an *installed* backend failed to import a
+        # transitive dependency - re-raise that as-is rather than mislabeling it
+        # as "install styxkit[...]".
+        if exc.name != backend.module:
+            raise
         raise ModuleNotFoundError(
             f"The {kind!r} runner needs the {backend.module!r} package. "
             f'Install it with `pip install "styxkit[{kind}]"` '
@@ -88,9 +94,12 @@ def use_local(**kwargs: typing.Any) -> Runner:
     return _use(LocalRunner(**kwargs))
 
 
-def use_dry(**kwargs: typing.Any) -> Runner:
-    """Register a ``DryRunner`` as the global runner and return it."""
-    return _use(DryRunner(**kwargs))
+def use_dry() -> Runner:
+    """Register a ``DryRunner`` as the global runner and return it.
+
+    ``DryRunner`` takes no configuration, so this helper accepts no arguments.
+    """
+    return _use(DryRunner())
 
 
 def use_docker(**kwargs: typing.Any) -> Runner:
