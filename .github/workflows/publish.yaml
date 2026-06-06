@@ -21,6 +21,7 @@ on:
     - 'styxdocker-v*'
     - 'styxpodman-v*'
     - 'styxsingularity-v*'
+    - 'styxkit-v*'
 
 jobs:
   publish:

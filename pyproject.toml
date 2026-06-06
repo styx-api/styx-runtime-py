@@ -31,6 +31,7 @@ styxcontainer-common = { workspace = true }
 styxdocker = { workspace = true }
 styxpodman = { workspace = true }
 styxsingularity = { workspace = true }
+styxkit = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["packages"]
@@ -55,3 +56,6 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*.py" = ["ANN", "D100", "D101", "D102", "D103", "D104"]
+# styxkit's use_*() helpers forward arbitrary kwargs to runner constructors,
+# so typing.Any in their signatures is intentional.
+"packages/styxkit/src/styxkit/__init__.py" = ["ANN401"]
