@@ -10,6 +10,7 @@ members = [
     "styxdefs",
     "styxdocker",
     "styxgraph",
+    "styxkit",
     "styxpodman",
     "styxsingularity",
 ]
@@ -911,6 +912,48 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "styxdefs", editable = "packages/styxdefs" }]
+
+[[package]]
+name = "styxkit"
+version = "0.1.0"
+source = { editable = "packages/styxkit" }
+dependencies = [
+    { name = "styxdefs" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "styxdocker" },
+    { name = "styxgraph" },
+    { name = "styxpodman" },
+    { name = "styxsingularity" },
+]
+docker = [
+    { name = "styxdocker" },
+]
+graph = [
+    { name = "styxgraph" },
+]
+podman = [
+    { name = "styxpodman" },
+]
+singularity = [
+    { name = "styxsingularity" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "styxdefs", editable = "packages/styxdefs" },
+    { name = "styxdocker", marker = "extra == 'all'", editable = "packages/styxdocker" },
+    { name = "styxdocker", marker = "extra == 'docker'", editable = "packages/styxdocker" },
+    { name = "styxgraph", marker = "extra == 'all'", editable = "packages/styxgraph" },
+    { name = "styxgraph", marker = "extra == 'graph'", editable = "packages/styxgraph" },
+    { name = "styxpodman", marker = "extra == 'all'", editable = "packages/styxpodman" },
+    { name = "styxpodman", marker = "extra == 'podman'", editable = "packages/styxpodman" },
+    { name = "styxsingularity", marker = "extra == 'all'", editable = "packages/styxsingularity" },
+    { name = "styxsingularity", marker = "extra == 'singularity'", editable = "packages/styxsingularity" },
+]
+provides-extras = ["docker", "podman", "singularity", "graph", "all"]
 
 [[package]]
 name = "styxpodman"

@@ -1,0 +1,25 @@
+[project]
+name = "styxkit"
+version = "0.1.0"
+description = "Convenience helpers spanning the Styx runtime backends."
+authors = [
+  {name = "Florian Rupprecht", email = "33600480+nx10@users.noreply.github.com"}
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+  "styxdefs>=0.7.0,<0.8",
+]
+
+# Backends are imported lazily; install the ones you need (or `styxkit[all]`).
+[project.optional-dependencies]
+docker = ["styxdocker"]
+podman = ["styxpodman"]
+singularity = ["styxsingularity"]
+graph = ["styxgraph"]
+all = ["styxdocker", "styxpodman", "styxsingularity", "styxgraph"]
+
+[build-system]
+requires = ["uv_build>=0.8.13,<0.10.0"]
+build-backend = "uv_build"
